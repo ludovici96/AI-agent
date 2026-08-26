@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
+import argparse
 
 def main():
     load_dotenv()
@@ -14,12 +15,15 @@ def main():
         api_key=api_key,
     )
 
-    prompt = "Why is Boot.dev such a great place to learn backend development? Use one paragraph maximum."
+    parser = argparse.ArgumentParser(description="Chatbot")
+    parser.add_argument("user_prompt", type=str, help="User prompt")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
+    args = parser.parse_args()
 
     messages: list[ChatCompletionMessageParam] = [
         {
             "role": "user",
-            "content": prompt,
+            "content": args.user_prompt,
         }
     ]
 
@@ -27,10 +31,19 @@ def main():
         model="openrouter/free",
         messages=messages,
     )
-
-    print(f"prompt: {prompt}\n")
-    print(f"response: {response.choices[0].message.content}")
     
+    usage = response.usage
+    if args.verbose:
+        if usage is not None:
+            print(f"User prompt: {args.user_prompt}\n")
+            print(f"Prompt tokens: {usage.prompt_tokens}\n"
+                f"Response tokens: {usage.completion_tokens}\n"
+                )
+        else:
+            print("Token usage unavailable\n")
+
+    print(f"response: {response.choices[0].message.content.strip()}")
+    #print(repr(response.choices[0].message.content))
 
 
 if __name__ == "__main__":
