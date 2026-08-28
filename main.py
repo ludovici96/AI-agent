@@ -1,8 +1,12 @@
 import os
+import json
+import argparse
 from dotenv import load_dotenv
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
-import argparse
+from prompts import system_prompt
+from functions.call_function import available_functions
+
 
 def main():
     load_dotenv()
@@ -22,6 +26,10 @@ def main():
 
     messages: list[ChatCompletionMessageParam] = [
         {
+            "role": "system", 
+            "content": system_prompt
+         },
+        {
             "role": "user",
             "content": args.user_prompt,
         }
@@ -30,6 +38,8 @@ def main():
     response = client.chat.completions.create(
         model="openrouter/free",
         messages=messages,
+        #temperature=0,
+        tools=available_functions,
     )
     
     usage = response.usage
@@ -42,8 +52,15 @@ def main():
         else:
             print("Token usage unavailable\n")
 
-    print(f"response: {response.choices[0].message.content.strip()}")
-    #print(repr(response.choices[0].message.content))
+    message = response.choices[0].message
+
+    if message.tool_calls:
+        for tool_call in message.tool_calls:
+            function_args = json.loads(tool_call.function.arguments or "{}")
+            print(f"Calling function: {tool_call.function.name}({function_args})")
+
+    else:
+        print(f"response: {response.choices[0].message.content.strip()}")
 
 
 if __name__ == "__main__":
