@@ -1,6 +1,9 @@
 import os
 import subprocess
 
+from openai.types.chat import ChatCompletionFunctionToolParam
+
+
 def run_python_file(working_directory: str, file_path: str, args: list[str] | None = None) -> str:
     try:
         abs_working_dir = os.path.abspath(working_directory)
@@ -56,7 +59,7 @@ def run_python_file(working_directory: str, file_path: str, args: list[str] | No
     except Exception as e:
         return f"Error: executing Python file: {e}"
 
-schema_run_python_file = {
+schema_run_python_file: ChatCompletionFunctionToolParam = {
     "type": "function",
     "function": {
         "name": "run_python_file",

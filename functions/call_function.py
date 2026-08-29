@@ -1,12 +1,18 @@
 import json
 from collections.abc import Callable
+
+from openai.types.chat import (
+    ChatCompletionFunctionToolParam,
+    ChatCompletionToolMessageParam,
+)
+
 from functions.get_files_info import get_files_info, schema_get_files_info 
 from functions.get_file_content import get_file_content, schema_get_file_content 
 from functions.write_file import write_file, schema_write_file 
 from functions.run_python_file import run_python_file, schema_run_python_file
 
 
-available_functions = [
+available_functions: list[ChatCompletionFunctionToolParam] = [
     schema_get_files_info,
     schema_get_file_content,
     schema_write_file,
@@ -20,8 +26,7 @@ function_map: dict[str, Callable[..., str]] = {
     "run_python_file": run_python_file, 
     }
 
-
-def call_function(tool_call, verbose: bool = False) -> dict:
+def call_function(tool_call, verbose: bool) -> ChatCompletionToolMessageParam:
     function_name = tool_call.function.name
     function_args = json.loads(tool_call.function.arguments or "{}")
 

@@ -1,8 +1,13 @@
 import os
+import sys
 import argparse
 from dotenv import load_dotenv
 from openai import OpenAI
-from openai.types.chat import ChatCompletionMessageParam
+from openai.types.chat import (
+    ChatCompletionAssistantMessageParam,
+    ChatCompletionMessageParam,
+    ChatCompletionMessageToolCallUnionParam,
+)
 from prompts import system_prompt
 from functions.call_function import available_functions, call_function
 
@@ -34,38 +39,81 @@ def main():
         }
     ]
 
-    response = client.chat.completions.create(
-        model="openrouter/free",
-        messages=messages,
-        #temperature=0,
-        tools=available_functions,
-    )
-    
-    usage = response.usage
-    if args.verbose:
-        if usage is not None:
-            print(f"User prompt: {args.user_prompt}\n")
-            print(f"Prompt tokens: {usage.prompt_tokens}\n"
-                f"Response tokens: {usage.completion_tokens}\n"
+    for _ in range(20):
+        response = client.chat.completions.create(
+            model="openrouter/free",
+            messages=messages,
+            tools=available_functions,
+        )
+
+        usage = response.usage
+
+        if args.verbose:
+            if usage is not None:
+                print(f"User prompt: {args.user_prompt}\n")
+                print(
+                    f"Prompt tokens: {usage.prompt_tokens}\n"
+                    f"Response tokens: {usage.completion_tokens}\n"
                 )
+            else:
+                print("Token usage unavailable\n")
+
+        message = response.choices[0].message
+
+        if message.tool_calls:
+            serialized_tool_calls: list[ChatCompletionMessageToolCallUnionParam] = []
+            for tool_call in message.tool_calls:
+                if tool_call.type == "function":
+                    serialized_tool_calls.append(
+                        {
+                            "id": tool_call.id,
+                            "type": "function",
+                            "function": {
+                                "name": tool_call.function.name,
+                                "arguments": tool_call.function.arguments,
+                            },
+                        }
+                    )
+                else:
+                    serialized_tool_calls.append(
+                        {
+                            "id": tool_call.id,
+                            "type": "custom",
+                            "custom": {
+                                "name": tool_call.custom.name,
+                                "input": tool_call.custom.input,
+                            },
+                        }
+                    )
+
+            assistant_message: ChatCompletionAssistantMessageParam = {
+                "role": "assistant",
+                "content": message.content,
+                "tool_calls": serialized_tool_calls,
+            }
+            messages.append(assistant_message)
+
+            for tool_call in message.tool_calls:
+                if tool_call.type != "function":
+                    raise RuntimeError(f"Unsupported tool type: {tool_call.type}")
+
+                result_message = call_function(tool_call, verbose=args.verbose)
+
+                if not result_message["content"]:
+                    raise RuntimeError("Function call returned empty content")
+
+                messages.append(result_message)
+
+                if args.verbose:
+                    print(f"-> {result_message['content']}")
+
         else:
-            print("Token usage unavailable\n")
+            content = message.content or ""
+            print(f"Final response:\n{content.strip()}")
+            return
 
-    message = response.choices[0].message
-
-    if message.tool_calls:
-        for tool_call in message.tool_calls:
-            result_message = call_function(tool_call, verbose=args.verbose)
-
-            if not result_message["content"]:
-                raise RuntimeError("Function call returned empty content")
-
-            if args.verbose:
-                print(f"-> {result_message['content']}")
-
-    else:
-        content = message.content or ""
-        print(f"response: {content.strip()}")
+    print("Error: Maximum number of iterations reached without a final response")
+    sys.exit(1)
 
 
 if __name__ == "__main__":

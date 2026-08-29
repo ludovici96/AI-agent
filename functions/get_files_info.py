@@ -1,5 +1,8 @@
 import os
 
+from openai.types.chat import ChatCompletionFunctionToolParam
+
+
 def get_files_info(working_directory: str, directory: str = ".") -> str:
     try:
         abs_working_dir = os.path.abspath(working_directory)
@@ -28,7 +31,7 @@ def get_files_info(working_directory: str, directory: str = ".") -> str:
     except Exception as e:
         return f'Error: {str(e)}'
 
-schema_get_files_info = {
+schema_get_files_info: ChatCompletionFunctionToolParam = {
     "type": "function",
     "function": {
         "name": "get_files_info",
